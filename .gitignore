@@ -39,3 +39,23 @@
 
 # debug information files
 *.dwo
+
+# Build directory
+build/
+
+# Generated test data
+data/*.bin
+data/*.json
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Notes
+notes.txt
