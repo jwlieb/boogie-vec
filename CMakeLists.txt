@@ -28,5 +28,11 @@ add_executable(boogie_vec_server
 find_package(Threads REQUIRED)
 target_link_libraries(boogie_vec_server PRIVATE Threads::Threads)
 
+# Link filesystem library (C++17)
+find_library(FILESYSTEM_LIB c++fs)
+if(FILESYSTEM_LIB)
+    target_link_libraries(boogie_vec_server PRIVATE ${FILESYSTEM_LIB})
+endif()
+
 # Install target (optional)
 install(TARGETS boogie_vec_server DESTINATION bin)

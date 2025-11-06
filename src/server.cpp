@@ -25,6 +25,14 @@ void Server::update_state(std::unique_ptr<IndexBackend> new_index,
     state_.loaded.store(true);
 }
 
+void Server::send_error(httplib::Response& res, int status, const std::string& code, const std::string& message) const {
+    res.status = status;
+    nlohmann::json error_response;
+    error_response["error"]["code"] = code;
+    error_response["error"]["message"] = message;
+    res.set_content(error_response.dump(), "application/json");
+}
+
 void Server::handle_healthz(const httplib::Request&, httplib::Response& res) {
     res.set_content("ok", "text/plain");
 }
@@ -68,20 +76,35 @@ void Server::handle_stats(const httplib::Request&, httplib::Response& res) {
 
 void Server::handle_load(const httplib::Request& req, httplib::Response& res) {
     try {
-        auto json_req = nlohmann::json::parse(req.body);
+        nlohmann::json json_req;
+        try {
+            json_req = nlohmann::json::parse(req.body);
+        } catch (const nlohmann::json::parse_error& e) {
+            send_error(res, 400, "INVALID_JSON", "Failed to parse JSON: " + std::string(e.what()));
+            return;
+        }
+        
+        if (!json_req.contains("path")) {
+            send_error(res, 400, "MISSING_FIELD", "Missing required field: path");
+            return;
+        }
         
         std::string vectors_path = json_req["path"];
         std::string ids_path = json_req.value("ids_path", "");
         std::string metric = json_req.value("metric", "cosine");
         std::string backend = json_req.value("backend", "bruteforce");
         
+        if (backend != "bruteforce") {
+            send_error(res, 400, "UNSUPPORTED_BACKEND", "Backend '" + backend + "' not yet supported. Use 'bruteforce'.");
+            return;
+        }
+        
         LOG_INFO("Loading snapshot from: " + vectors_path);
         
         SnapshotData snapshot = load_snapshot(vectors_path, ids_path);
         
         if (snapshot.count == 0) {
-            res.status = 400;
-            res.set_content("{ \"ok\": false, \"error\": \"Failed to load snapshot\" }", "application/json");
+            send_error(res, 400, "LOAD_FAILED", "Failed to load snapshot from: " + vectors_path);
             return;
         }
         
@@ -102,23 +125,47 @@ void Server::handle_load(const httplib::Request& req, httplib::Response& res) {
         
     } catch (const std::exception& e) {
         LOG_ERROR("Load request failed: " + std::string(e.what()));
-        res.status = 400;
-        res.set_content("{ \"ok\": false, \"error\": \"Invalid JSON or missing fields\" }", "application/json");
+        send_error(res, 500, "INTERNAL_ERROR", "Internal error: " + std::string(e.what()));
     }
 }
 
 void Server::handle_query(const httplib::Request& req, httplib::Response& res) {
     if (!state_.loaded.load()) {
-        res.status = 400;
-        res.set_content("{ \"error\": \"No index loaded. Call /load first.\" }", "application/json");
+        send_error(res, 400, "NO_INDEX", "No index loaded. Call /load first.");
         return;
     }
     
     try {
-        auto json_req = nlohmann::json::parse(req.body);
+        nlohmann::json json_req;
+        try {
+            json_req = nlohmann::json::parse(req.body);
+        } catch (const nlohmann::json::parse_error& e) {
+            send_error(res, 400, "INVALID_JSON", "Failed to parse JSON: " + std::string(e.what()));
+            return;
+        }
+        
+        if (!json_req.contains("k")) {
+            send_error(res, 400, "MISSING_FIELD", "Missing required field: k");
+            return;
+        }
+        if (!json_req.contains("vector")) {
+            send_error(res, 400, "MISSING_FIELD", "Missing required field: vector");
+            return;
+        }
         
         int k = json_req["k"];
-        std::vector<float> query_vector = json_req["vector"];
+        if (k <= 0) {
+            send_error(res, 400, "INVALID_VALUE", "k must be greater than 0, got: " + std::to_string(k));
+            return;
+        }
+        
+        std::vector<float> query_vector;
+        try {
+            query_vector = json_req["vector"].get<std::vector<float>>();
+        } catch (const std::exception& e) {
+            send_error(res, 400, "INVALID_FIELD", "Invalid vector format: " + std::string(e.what()));
+            return;
+        }
         
         IndexBackend* index;
         int dim;
@@ -129,8 +176,7 @@ void Server::handle_query(const httplib::Request& req, httplib::Response& res) {
         {
             std::lock_guard<std::mutex> lk(state_.m);
             if (!state_.index) {
-                res.status = 400;
-                res.set_content("{ \"error\": \"No index loaded. Call /load first.\" }", "application/json");
+                send_error(res, 400, "NO_INDEX", "No index loaded. Call /load first.");
                 return;
             }
             index = state_.index.get();
@@ -142,9 +188,15 @@ void Server::handle_query(const httplib::Request& req, httplib::Response& res) {
         
         // Validate dimensions
         if (static_cast<int>(query_vector.size()) != dim) {
-            res.status = 400;
-            res.set_content("{ \"error\": \"Query vector dimension mismatch\" }", "application/json");
+            send_error(res, 400, "DIMENSION_MISMATCH", 
+                      "Query vector dimension mismatch: expected " + std::to_string(dim) + 
+                      ", got " + std::to_string(query_vector.size()));
             return;
+        }
+        
+        // Cap k to available vectors
+        if (static_cast<size_t>(k) > count) {
+            k = static_cast<int>(count);
         }
         
         Timer timer;
@@ -180,8 +232,7 @@ void Server::handle_query(const httplib::Request& req, httplib::Response& res) {
         
     } catch (const std::exception& e) {
         LOG_ERROR("Query request failed: " + std::string(e.what()));
-        res.status = 400;
-        res.set_content("{ \"error\": \"Invalid JSON or missing fields\" }", "application/json");
+        send_error(res, 500, "INTERNAL_ERROR", "Internal error: " + std::string(e.what()));
     }
 }
 

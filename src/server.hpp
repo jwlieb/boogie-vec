@@ -46,4 +46,6 @@ private:
     void update_state(std::unique_ptr<IndexBackend> new_index, 
                      const std::string& backend_name,
                      const std::string& metric);
+    
+    void send_error(httplib::Response& res, int status, const std::string& code, const std::string& message) const;
 };

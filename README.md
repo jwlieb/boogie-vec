@@ -64,6 +64,9 @@ curl http://127.0.0.1:8080/healthz
 # First generate test data, then run tests
 python3 examples/ingest.py 10 384
 ./tests/test_boogie_vec.sh
+
+# Or run smoke test (builds, starts server, runs full test suite)
+./tests/smoke.sh
 ```
 
 ---
@@ -99,6 +102,7 @@ Load an index snapshot.
   "backend": "bruteforce"
 }
 ```
+**Error responses:** `{"error": {"code": "CODE", "message": "..."}}`
 
 ### `POST /query`
 Return top-K nearest neighbors.
@@ -108,6 +112,7 @@ Return top-K nearest neighbors.
   "vector": [0.12, -0.03, ...]
 }
 ```
+**Validation:** `k` must be > 0, vector dimension must match loaded index.
 
 ### `GET /stats`
 Returns service stats including latency percentiles (p50/p95/p99), QPS over 1-minute window, and uptime.
@@ -140,12 +145,11 @@ Returns `ok` if ready.
 
 ---
 
-## Example Performance (to fill in)
-| Count | Dim | Backend | k | p50 (ms) | p95 (ms) |
-|-------:|----:|----------|---|----------:|----------:|
-| 10k   | 384 | bruteforce | 20 | 4.1 | 9.8 |
-| 25k   | 384 | bruteforce | 20 | 11.3 | 23.7 |
-| 50k   | 384 | annoy(ef=64) | 20 | 7.2 | 15.9 |
+## Performance
+
+Performance metrics are tracked via the `/stats` endpoint. Example benchmarks will be added as data is collected.
+
+For reference, brute-force search scales roughly as O(N×d×k) where N is vector count, d is dimension, and k is requested neighbors.
 
 ---
 
@@ -164,7 +168,7 @@ This project includes the following third-party libraries:
 - **cpp-httplib** (MIT License) - Single-header HTTP server library
 - **nlohmann/json** (MIT License) - JSON for Modern C++
 
-Both libraries are included as single-header files in `third_party/` for convenience.
+Both libraries are included as single-header files in `third_party/` for convenience. See [ATTRIBUTIONS.md](ATTRIBUTIONS.md) for details.
 
 ## Roadmap
 - Binary float payloads for lower JSON overhead
