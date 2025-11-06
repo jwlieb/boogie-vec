@@ -10,8 +10,10 @@ and fast enough for 10–50k vectors out of the box.
 - HTTP/JSON API: `/load`, `/query`, `/stats`, `/healthz`
 - Backends: `bruteforce` (default), `annoy`, `faiss` (optional)
 - Snapshot I/O: binary float32 vectors + optional IDs JSON
-- Built-in timing (p50/p95/p99), QPS over 1m window
-- Single binary, no external services; Dockerfile provided
+- Latency tracking (p50/p95/p99), QPS over 1m window, uptime monitoring
+- Structured JSON logging for queries
+- Clean backend abstraction via `IndexBackend` interface
+- Single binary, no external services
 
 ---
 
@@ -108,7 +110,7 @@ Return top-K nearest neighbors.
 ```
 
 ### `GET /stats`
-Returns service stats and latency percentiles.
+Returns service stats including latency percentiles (p50/p95/p99), QPS over 1-minute window, and uptime.
 
 ### `GET /healthz`
 Returns `ok` if ready.
@@ -130,7 +132,8 @@ Returns `ok` if ready.
         +--------------------------------+
         |         Boogie-Vec (C++)       |
         |--------------------------------|
-        |  KNN Index / Storage / Server  |
+        |  HTTP Server / Route Handlers  |
+        |  IndexBackend (pluggable)      |
         |  Snapshot I/O / Metrics / API  |
         +--------------------------------+
 ```
@@ -146,9 +149,11 @@ Returns `ok` if ready.
 
 ---
 
-## Environment Variables
-- `PORT` (default `8080`)
-- `BOOGIE_VEC_LOG=debug|info|warn` (default `info`)
+## Architecture Notes
+
+- **Backend Abstraction**: The `IndexBackend` interface allows swapping brute-force search with optimized backends (Annoy, FAISS) without changing server code.
+- **Metrics**: Latency tracked via ring buffer (1000 samples), QPS calculated over 1-minute rolling window.
+- **Threading**: Thread-safe state management with mutexes for concurrent query handling.
 
 ---
 

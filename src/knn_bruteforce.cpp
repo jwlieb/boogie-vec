@@ -4,16 +4,12 @@
 #include <cmath>
 #include <iostream>
 
-std::vector<Neighbor> search_knn(
-    const std::vector<float>& query_vector,
-    const std::vector<float>& data,
-    const std::vector<float>& norms,
-    const std::vector<std::string>& ids,
-    uint32_t dim,
-    uint32_t count,
-    int k
-) {
+std::vector<Neighbor> BruteforceIndex::search_knn(
+    const std::vector<float>& query_vector, int k) {
     std::vector<Neighbor> results;
+    
+    uint32_t dim = snapshot_.dim;
+    uint32_t count = snapshot_.count;
     
     if (query_vector.size() != dim) {
         std::cerr << "Query vector dimension mismatch: expected " << dim << ", got " << query_vector.size() << std::endl;
@@ -37,18 +33,17 @@ std::vector<Neighbor> search_knn(
     }
     
     // Use a min-heap to maintain top-k results
-    // We use a min-heap so we can efficiently remove the worst result
     std::priority_queue<std::pair<float, uint32_t>, 
                        std::vector<std::pair<float, uint32_t>>, 
                        std::greater<std::pair<float, uint32_t>>> heap;
     
     // Compute cosine similarity for all vectors
     for (uint32_t i = 0; i < count; i++) {
-        const float* vector = &data[i * dim];
-        float norm = norms[i];
+        const float* vector = &snapshot_.data[i * dim];
+        float norm = snapshot_.norms[i];
         
         if (norm == 0.0f) {
-            continue; // Skip zero-norm vectors
+            continue;
         }
         
         // Compute dot product
@@ -69,7 +64,7 @@ std::vector<Neighbor> search_knn(
         }
     }
     
-    // Extract results from heap (they'll be in reverse order due to min-heap)
+    // Extract results from heap
     std::vector<std::pair<float, uint32_t>> temp_results;
     while (!heap.empty()) {
         temp_results.push_back(heap.top());
@@ -82,7 +77,7 @@ std::vector<Neighbor> search_knn(
     
     // Convert to Neighbor objects
     for (const auto& result : temp_results) {
-        results.emplace_back(ids[result.second], result.first);
+        results.emplace_back(snapshot_.ids[result.second], result.first);
     }
     
     return results;
