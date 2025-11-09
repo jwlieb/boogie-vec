@@ -3,6 +3,8 @@
 #include "json.hpp"
 #include "snapshot_io.hpp"
 #include "util.hpp"
+#include "backend_factory.hpp"
+#include "knn_annoy.hpp"
 
 Server::Server(std::unique_ptr<IndexBackend> backend, int port)
     : state_(), latency_tracker_(), qps_tracker_(), uptime_tracker_(), port_(port) {
@@ -93,24 +95,48 @@ void Server::handle_load(const httplib::Request& req, httplib::Response& res) {
         std::string ids_path = json_req.value("ids_path", "");
         std::string metric = json_req.value("metric", "cosine");
         std::string backend = json_req.value("backend", "bruteforce");
+        int n_trees = json_req.value("n_trees", 50);  // For Annoy backend
         
-        if (backend != "bruteforce") {
-            send_error(res, 400, "UNSUPPORTED_BACKEND", "Backend '" + backend + "' not yet supported. Use 'bruteforce'.");
+        std::unique_ptr<IndexBackend> new_backend;
+        size_t count = 0;
+        int dim = 0;
+        
+        if (backend == "annoy") {
+            // Annoy requires pre-built index file (not vectors.bin)
+            LOG_INFO("Loading Annoy index from: " + vectors_path);
+            new_backend = AnnoyIndex::load(vectors_path, ids_path, n_trees);
+            
+            if (!new_backend) {
+                send_error(res, 400, "LOAD_FAILED", 
+                          "Failed to load Annoy index. Ensure index file exists and Annoy is integrated.");
+                return;
+            }
+            
+            count = new_backend->get_count();
+            dim = new_backend->get_dim();
+        } else if (backend == "bruteforce") {
+            LOG_INFO("Loading snapshot from: " + vectors_path);
+            
+            SnapshotData snapshot = load_snapshot(vectors_path, ids_path);
+            
+            if (snapshot.count == 0) {
+                send_error(res, 400, "LOAD_FAILED", "Failed to load snapshot from: " + vectors_path);
+                return;
+            }
+            
+            new_backend = create_backend(backend, std::move(snapshot));
+            if (!new_backend) {
+                send_error(res, 500, "INTERNAL_ERROR", "Failed to create backend");
+                return;
+            }
+            
+            count = new_backend->get_count();
+            dim = new_backend->get_dim();
+        } else {
+            send_error(res, 400, "UNSUPPORTED_BACKEND", 
+                      "Backend '" + backend + "' not supported. Use 'bruteforce' or 'annoy'.");
             return;
         }
-        
-        LOG_INFO("Loading snapshot from: " + vectors_path);
-        
-        SnapshotData snapshot = load_snapshot(vectors_path, ids_path);
-        
-        if (snapshot.count == 0) {
-            send_error(res, 400, "LOAD_FAILED", "Failed to load snapshot from: " + vectors_path);
-            return;
-        }
-        
-        auto new_backend = std::make_unique<BruteforceIndex>(std::move(snapshot));
-        size_t count = new_backend->get_count();
-        int dim = new_backend->get_dim();
         
         update_state(std::move(new_backend), backend, metric);
         

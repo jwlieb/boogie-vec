@@ -21,6 +21,8 @@ add_executable(boogie_vec_server
   src/server.cpp
   src/snapshot_io.cpp
   src/knn_bruteforce.cpp
+  src/knn_annoy.cpp
+  src/backend_factory.cpp
   src/util.cpp
 )
 

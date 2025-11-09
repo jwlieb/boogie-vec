@@ -99,9 +99,11 @@ Load an index snapshot.
   "dim": 384,
   "metric": "cosine",
   "ids_path": "/abs/path/to/ids.json",
-  "backend": "bruteforce"
+  "backend": "bruteforce",
+  "n_trees": 50
 }
 ```
+**Backends:** `bruteforce` (default), `annoy` (requires pre-built index, integration pending)
 **Error responses:** `{"error": {"code": "CODE", "message": "..."}}`
 
 ### `POST /query`
