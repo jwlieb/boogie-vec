@@ -169,8 +169,9 @@ This project includes the following third-party libraries:
 
 - **cpp-httplib** (MIT License) - Single-header HTTP server library
 - **nlohmann/json** (MIT License) - JSON for Modern C++
+- **Annoy** (Apache License 2.0) - Approximate Nearest Neighbors library by Spotify
 
-Both libraries are included as single-header files in `third_party/` for convenience. See [ATTRIBUTIONS.md](ATTRIBUTIONS.md) for details.
+All libraries are included as header files in `third_party/` for convenience. See [ATTRIBUTIONS.md](ATTRIBUTIONS.md) for details.
 
 ## Roadmap
 - Binary float payloads for lower JSON overhead

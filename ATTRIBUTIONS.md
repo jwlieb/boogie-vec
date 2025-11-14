@@ -20,5 +20,15 @@ JSON for Modern C++ - A header-only JSON library.
 - **Included as**: `third_party/json.hpp`
 - **License file**: See `third_party/json.hpp` for full license text (MIT License)
 
-Both libraries are included as single-header files in the `third_party/` directory for convenience and are used under their respective MIT licenses.
+## Annoy
+
+Approximate Nearest Neighbors library by Spotify.
+
+- **License**: Apache License 2.0
+- **Source**: https://github.com/spotify/annoy
+- **Included as**: `third_party/annoy/annoylib.h` and `third_party/annoy/kissrandom.h`
+- **License file**: See `third_party/annoy/annoylib.h` for full license text (Apache License 2.0)
+- **Copyright**: Copyright (c) 2013 Spotify AB
+
+All libraries are included as header files in the `third_party/` directory for convenience and are used under their respective licenses.
 
