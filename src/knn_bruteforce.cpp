@@ -16,8 +16,14 @@ std::vector<Neighbor> BruteforceIndex::search_knn(
         return results;
     }
     
-    if (k <= 0 || static_cast<uint32_t>(k) > count) {
-        k = std::min(static_cast<int>(count), k);
+    // Validate k: must be positive
+    if (k <= 0) {
+        return results;  // Return empty results for invalid k
+    }
+    
+    // Cap k to available vector count
+    if (static_cast<uint32_t>(k) > count) {
+        k = static_cast<int>(count);
     }
     
     // Compute query norm
